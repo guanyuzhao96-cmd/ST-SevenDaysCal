@@ -3,6 +3,27 @@ import { diagnosticMessage } from '../../api/diagnostics.js';
 
 const EMPTY_COUNTS = Object.freeze({ entries: 0, matched: 0, usable: 0, selected: 0 });
 
+// CWB archives belong to a character avatar, not to a chat or a book name.
+export function cwbOwner(context) {
+    const chars = context?.characters || [];
+    let char = context?.characterId != null && context.characterId !== '' ? chars[context.characterId] : null;
+    if (!char?.avatar) {
+        const group = (context?.groups || []).find(g => String(g.id) === String(context?.groupId));
+        const members = [...new Set(group?.members || [])];
+        if (members.length === 1) char = Object.values(chars).find(c => c?.avatar === members[0]);
+    }
+    return typeof char?.avatar === 'string' && char.avatar.trim() ? `CWB:角色卡:${encodeURIComponent(char.avatar)}` : '';
+}
+
+export function cwbMemoryType(entry, owner) {
+    const keys = [entry?.key, entry?.keys, entry?.strategy?.keys].flatMap(v => Array.isArray(v) ? v : []).map(String);
+    const owners = [...new Set(keys.filter(k => k.startsWith('CWB:角色卡:')))];
+    if (!owner || owners.length !== 1 || owners[0] !== owner) return '';
+    if (keys.includes('CWB:故事时间线')) return '故事时间线';
+    if (keys.includes('CWB:角色关系汇总')) return '角色关系';
+    return '';
+}
+
 export function normalizeDatabaseWorldbookName(value) {
     return String(value ?? '').trim();
 }
@@ -34,6 +55,7 @@ export async function readDatabaseMemory({
     selectSlices,
     query = '',
     limit = 20,
+    owner = '',
 } = {}) {
     // Copy scalar values before the first await so a settings/chat change cannot
     // retarget this in-flight read.
@@ -52,8 +74,9 @@ export async function readDatabaseMemory({
     }
     if (!Array.isArray(entries)) return resultFor('invalid-response', frozenTarget);
 
+    const cwbEntries = entries.map(entry => ({ entry, type: cwbMemoryType(entry, owner) })).filter(item => item.type);
     const matchedEntries = entries.filter(isDatabaseMemoEntry);
-    if (!matchedEntries.length) {
+    if (!matchedEntries.length && !cwbEntries.length) {
         return resultFor('no-match', frozenTarget, { entries: entries.length });
     }
     const memories = matchedEntries.map((entry, index) => ({
@@ -64,7 +87,8 @@ export async function readDatabaseMemory({
         time: '',
     }));
     const nonEmpty = memories.filter(item => item.text);
-    if (!nonEmpty.length) {
+    const cwb = cwbEntries.filter(item => String(item.entry?.content || '').trim());
+    if (!nonEmpty.length && !cwb.length) {
         return resultFor('empty-content', frozenTarget, {
             entries: entries.length,
             matched: matchedEntries.length,
@@ -75,13 +99,14 @@ export async function readDatabaseMemory({
         ? selectSlices(nonEmpty, String(query ?? ''), limit)
         : nonEmpty.slice(0, limit);
     const selected = Array.isArray(picked) ? picked : [];
-    const text = selected.map(item => String(item?.text || '').trim()).filter(Boolean).join('\n\n');
+    const text = [...cwb.map(item => `【角色档案：${item.type}】\n${String(item.entry.content).trim()}`),
+        ...selected.map(item => String(item?.text || '').trim()).filter(Boolean)].join('\n\n');
     return {
         ...resultFor(text ? 'ready' : 'empty-content', frozenTarget, {
             entries: entries.length,
-            matched: matchedEntries.length,
-            usable: nonEmpty.length,
-            selected: selected.length,
+            matched: matchedEntries.length + cwbEntries.length,
+            usable: nonEmpty.length + cwb.length,
+            selected: selected.length + cwb.length,
         }),
         text,
     };
@@ -93,12 +118,14 @@ export function createDatabaseMemoryAccess({
     buildQuery,
     getLimit,
     selectSlices,
+    captureOwner,
 } = {}) {
     async function result(opts = {}) {
         // Target and reader are both captured synchronously. The same path serves
         // settings diagnostics, generation preflight and the final prompt injection.
         const target = resolveDatabaseWorldbookTarget(captureTarget?.() || {});
         const reader = captureReader?.();
+        const owner = captureOwner?.() || '';
         try {
             return await readDatabaseMemory({
                 target,
@@ -106,6 +133,7 @@ export function createDatabaseMemoryAccess({
                 selectSlices,
                 query: buildQuery?.(opts.query) ?? opts.query ?? '',
                 limit: getLimit?.() ?? 20,
+                owner,
             });
         } catch (error) {
             return resultFor('processing-failed', target, {}, { error });

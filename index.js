@@ -192,6 +192,7 @@ import { filterRerollItems, shouldRunPendingPointFollowup } from './runtime/refa
 import {
     createDatabaseMemoryAccess,
     databaseMemoryDiagnostic,
+    cwbOwner,
     databaseMemoryUiIdentity,
     normalizeDatabaseWorldbookName,
     renderDatabaseWorldbookOptions,
@@ -3528,10 +3529,10 @@ function injectModal() {
                                     </div>
                                     <label class="sp-mode-opt sp-mem-source-toggle">
                                         <input type="checkbox" id="sp-mem-source-database">
-                                        <span>使用数据库作为记忆源</span>
+                                        <span>使用数据库 / 角色档案作为记忆源</span>
                                     </label>
                                     <div id="sp-mem-database-worldbook-options" class="sp-mode-opt" style="display:none">
-                                        <span>数据库纪要所在世界书</span>
+                                        <span>数据库或角色档案所在世界书</span>
                                         <select id="sp-mem-database-worldbook" class="sp-input">
                                             <option value="">跟随角色主世界书（默认）</option>
                                         </select>
@@ -6917,6 +6918,7 @@ function captureDatabaseWorldbookReader() {
 const databaseMemoryAccess = createDatabaseMemoryAccess({
     captureTarget: captureDatabaseMemoryTarget,
     captureReader: captureDatabaseWorldbookReader,
+    captureOwner: () => cwbOwner(getContext()),
     buildQuery: buildAnimaRecallQuery,
     getLimit: getAnimaRecallCount,
     selectSlices: selectAnimaSlices,
