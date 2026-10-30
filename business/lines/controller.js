@@ -4,7 +4,7 @@ import { decideLinesCommit } from './generation.js';
 import { bindVectorTickets } from './vectors/bind.js';
 import { createGenerationDiagnosticScope, makeDiagnosticError, runGenerationUiEffect } from '../../api/diagnostics.js';
 import { drawAdultSelections, allocateAdultPools } from './adult.js';
-import { AUTO_LINE_CAPACITY, AUTO_LINE_SEED_CAPACITY } from './capacity.js';
+import { AUTO_LINE_SEED_CAPACITY } from './capacity.js';
 import { auditLineEvolution } from './evolution.js';
 import { freezeLineStore, lineStoreMatches } from './version-history.js';
 import { traceDiagnosticEvent } from '../../runtime/diagnostic-trace.js';
@@ -147,7 +147,7 @@ export function createLinesGenerationController(env = {}) {
             }, participantIdentity, contextSnapshot), signal);
             if (env.isEditing?.()) return { status: 'cancelled', reason: 'editing' };
             if (signal.aborted || travelAbort?.aborted || !owners.isCurrent(owner)) return { status: 'cancelled', reason: 'stale-owner' };
-            const checked = validateLinesResponse(raw, isInitial ? { maxCandidates: AUTO_LINE_CAPACITY } : {});
+            const checked = validateLinesResponse(raw);
             if (!checked.ok) {
                 const parseRejected = ['empty', 'incomplete-or-extraneous', 'text-outside-line', 'no-lines'].includes(checked.reason);
                 const code = parseRejected ? 'parse' : checked.reason === 'invalid-field' ? 'invalid-fields' : 'invalid-structure';

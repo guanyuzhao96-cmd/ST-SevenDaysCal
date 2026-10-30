@@ -29,10 +29,9 @@ export function auditLineEvolution({ previousLines = [], generatedLines = [], fr
             return { ok: false, reason: activeNames.has(name) ? 'evolution-duplicate-old-line' : 'evolution-duplicate-pinned-line' };
         } else {
             if (isTerminalLineStage(line.stage)) return { ok: false, reason: 'evolution-newborn-terminal' };
-            if (!line.ticketId) return { ok: false, reason: 'evolution-newborn-missing-ticket' };
         }
     }
     const ticketIds = new Set((Array.isArray(freshTickets) ? freshTickets : []).map(ticket => ticket?.ticketId).filter(Boolean));
-    for (const line of generated) if (!activeNames.has(line.name) && !pinnedNames.has(line.name) && !ticketIds.has(line.ticketId)) return { ok: false, reason: 'evolution-unknown-ticket' };
+    for (const line of generated) if (!activeNames.has(line.name) && !pinnedNames.has(line.name) && line.ticketId && !ticketIds.has(line.ticketId)) return { ok: false, reason: 'evolution-unknown-ticket' };
     return { ok: true };
 }

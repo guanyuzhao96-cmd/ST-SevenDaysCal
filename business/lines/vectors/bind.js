@@ -14,7 +14,8 @@ export function bindVectorTickets({ previousLines = [], generatedLines = [], fre
         // A terminal line is only valid when it closes an identity present in this run.
         // Dropping it here also leaves the next fresh ticket untouched.
         if (isTerminalLineStage(line?.stage)) { if (line.ticketId != null) throw new Error('terminal-line-ticket-forbidden'); return null; }
-        if (!line?.ticketId || used.has(line.ticketId)) throw new Error('missing-or-duplicate-ticket-id');
+        if (!line?.ticketId) return { ...line, adult: false, cue: null };
+        if (used.has(line.ticketId)) throw new Error('duplicate-ticket-id');
         const ticket = tickets.get(line.ticketId); if (!ticket) throw new Error('unknown-ticket-id');
         used.add(line.ticketId);
         const withoutTicket = { ...line }; delete withoutTicket.ticketId;
